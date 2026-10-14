@@ -1,4 +1,5 @@
-
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { useState } from 'react'
 import './App.css'
 
@@ -65,7 +66,15 @@ function App() {
       })
 
       if (!response.ok) {
-        throw new Error(`Request failed: ${response.status}`)
+        if (response.status === 429) {
+          throw new Error('Gemini request limit reached. Please wait before trying again.')
+        }
+
+        if (response.status === 503) {
+          throw new Error('Gemini is busy right now. Please try again shortly.')
+        }
+
+        throw new Error(`Request failed with status ${response.status}`)
       }
 
       const data = await response.json()
@@ -74,17 +83,14 @@ function App() {
         ...prev,
         { role: 'assistant', content: data.response },
       ])
-    } catch (error) {
+    }  catch (error) {
       console.error('Chat error:', error)
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: 'Sorry, something went wrong. Please try again.',
-        },
-      ])
-    } finally {
+      setMessages((prev) => [...prev, {
+        role: 'assistant',
+        content: error.message || 'Something went wrong. Please try again.',
+      }])
+    }finally {
       setIsLoading(false)
     }
   }
@@ -225,7 +231,13 @@ function App() {
                         </div>
 
                         <div className="message-content">
-                          {item.content}
+                          {item.role === 'assistant' ? (
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {item.content}
+                              </ReactMarkdown>
+                          ) : (
+                              item.content
+                          )}
                         </div>
                       </div>
                   ))}
@@ -233,8 +245,11 @@ function App() {
                   {isLoading && (
                       <div className="chat-message assistant">
                         <div className="message-role">GenX.AI</div>
-                        <div className="message-content">
-                          Thinking...
+                        <div className="thinking-indicator">
+                          <span />
+                          <span />
+                          <span />
+                          <p>GenX.AI is thinking</p>
                         </div>
                       </div>
                   )}
